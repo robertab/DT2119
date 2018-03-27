@@ -61,6 +61,9 @@ def preemp(input, p=0.97):
         output: array of pre-emphasised speech samples
     Note (you can use the function lfilter from scipy.signal)
     """
+    A = np.ones((1, input.shape[1]))
+    B = np.ones((1, input.shape[1])) * (1 - p)
+    return np.array(map(lambda xn: lfilter(B, A, xn), input))
     
 
 def windowing(input):
@@ -141,6 +144,7 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
     frames = enframe(example['samples'], 400, 200)
+    print(preemp(frames))
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
     ## print(frames[1])
