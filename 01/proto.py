@@ -1,3 +1,9 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from more_itertools import windowed
+from scipy.signal import lfilter
+# import more_itertools.windowed
+
 # DT2119, Lab 1 Feature Extraction
 
 # Function given by the exercise ----------------------------------
@@ -39,6 +45,8 @@ def enframe(samples, winlen, winshift):
         numpy array [N x winlen], where N is the number of windows that fit
         in the input signal
     """
+    return np.asarray(list(windowed(samples, winlen, step=winshift, fillvalue=0)))
+
     
 def preemp(input, p=0.97):
     """
@@ -53,6 +61,7 @@ def preemp(input, p=0.97):
         output: array of pre-emphasised speech samples
     Note (you can use the function lfilter from scipy.signal)
     """
+    
 
 def windowing(input):
     """
@@ -124,3 +133,24 @@ def dtw(x, y, dist):
 
     Note that you only need to define the first output for this exercise.
     """
+
+def main():
+    # print("Hello, world!")
+    example = np.load('data/lab1_example.npz')['example'].item()
+
+    # Data contains array of dictionaries
+    data = np.load('data/lab1_data.npz')['data']
+    frames = enframe(example['samples'], 400, 200)
+    # print(len(example['samples']))
+    # print(np.sum(frames - example['frames']))
+    ## print(frames[1])
+    #print(example['frames'][0])
+    # plt.plot(example['samples'])
+    # plt.show()
+
+
+
+
+if __name__ == '__main__':
+    main()
+    
