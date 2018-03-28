@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from more_itertools import windowed
-from scipy.signal import lfilter
+from scipy.signal import lfilter, hamming
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -61,9 +61,10 @@ def preemp(input, p=0.97):
         output: array of pre-emphasised speech samples
     Note (you can use the function lfilter from scipy.signal)
     """
-    A = np.ones((1, input.shape[1]))
-    B = np.ones((1, input.shape[1])) * (1 - p)
-    return np.array(map(lambda xn: lfilter(B, A, xn), input))
+    A = np.ones((input.shape[1], ))
+    B = np.ones((input.shape[1], )) * (1 - p)
+#     return np.array(list(map(lambda xn: lfilter(B, A, xn), input)))
+    return lfilter(B, A, input)
     
 
 def windowing(input):
@@ -144,13 +145,15 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
     frames = enframe(example['samples'], 400, 200)
-    print(preemp(frames))
+    pe = preemp(frames)
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
     ## print(frames[1])
-    #print(example['frames'][0])
-    # plt.plot(example['samples'])
-    # plt.show()
+    # print(example['frames'][0])
+#     plt.plot(pe)
+    plt.pcolormesh(pe) 
+
+    plt.show()
 
 
 
