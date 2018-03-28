@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from more_itertools import windowed
-from scipy.signal import lfilter, hamming
+from scipy.signal import *
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -61,11 +61,9 @@ def preemp(input, p=0.97):
         output: array of pre-emphasised speech samples
     Note (you can use the function lfilter from scipy.signal)
     """
-    A = np.ones((input.shape[1], ))
-    B = np.ones((input.shape[1], )) * (1 - p)
-#     return np.array(list(map(lambda xn: lfilter(B, A, xn), input)))
-    return lfilter(B, A, input)
-    
+    A = [1] 
+    B = [1, -p] 
+    return lfilter(B,A, input, axis=1)
 
 def windowing(input):
     """
@@ -79,6 +77,8 @@ def windowing(input):
     Note (you can use the function hamming from scipy.signal, include the sym=0 option
     if you want to get the same results as in the example)
     """
+    print(hamming(100,sym=0))
+    return 
 
 def powerSpectrum(input, nfft):
     """
@@ -146,14 +146,31 @@ def main():
     data = np.load('data/lab1_data.npz')['data']
     frames = enframe(example['samples'], 400, 200)
     pe = preemp(frames)
+    print(pe[0])
+    print(example['preemph'][0])
+    print(example['preemph'].shape)
+    print(pe.shape)
+    
+    plt.figure(1)
+    plt.subplot(211)
+    plt.title("frames")
+    plt.plot(frames)
+    plt.subplot(212)
+    plt.title("pre-emphasis")
+    plt.plot(pe)
+    plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
     ## print(frames[1])
     # print(example['frames'][0])
 #     plt.plot(pe)
-    plt.pcolormesh(pe) 
+#     plt.figure()
+#     plt.pcolormesh(example['preemph']) 
+#     plt.show()
+#     plt.pcolormesh(pe) 
+#     plt.show()
 
-    plt.show()
+    hm = windowing(pe)
 
 
 
