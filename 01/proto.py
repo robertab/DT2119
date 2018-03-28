@@ -77,8 +77,9 @@ def windowing(input):
     Note (you can use the function hamming from scipy.signal, include the sym=0 option
     if you want to get the same results as in the example)
     """
-    print(hamming(100,sym=0))
-    return 
+    # The amount of samples in one frame
+    frame_length = 400
+    return input * hamming(frame_length, sym=0)
 
 def powerSpectrum(input, nfft):
     """
@@ -146,18 +147,19 @@ def main():
     data = np.load('data/lab1_data.npz')['data']
     frames = enframe(example['samples'], 400, 200)
     pe = preemp(frames)
-    print(pe[0])
-    print(example['preemph'][0])
-    print(example['preemph'].shape)
-    print(pe.shape)
+    win = windowing(pe)
+    # print(pe[0])
+    # print(example['preemph'][0])
+    # print(example['preemph'].shape)
+    # print(pe.shape)
     
     plt.figure(1)
     plt.subplot(211)
     plt.title("frames")
-    plt.plot(frames)
+    plt.plot(win)
     plt.subplot(212)
     plt.title("pre-emphasis")
-    plt.plot(pe)
+    plt.plot(example['windowed'])
     plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
@@ -165,12 +167,11 @@ def main():
     # print(example['frames'][0])
 #     plt.plot(pe)
 #     plt.figure()
-#     plt.pcolormesh(example['preemph']) 
-#     plt.show()
+
 #     plt.pcolormesh(pe) 
 #     plt.show()
 
-    hm = windowing(pe)
+    # hm = windowing(pe)
 
 
 
