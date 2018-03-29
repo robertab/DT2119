@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from more_itertools import windowed
 from scipy.signal import *
+from scipy.fftpack import fft
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -93,6 +94,11 @@ def powerSpectrum(input, nfft):
         array of power spectra [N x nfft]
     Note: you can use the function fft from scipy.fftpack
     """
+    ps = fft(input,nfft)
+    print(ps)
+    print(ps.shape)
+    return ps
+
 
 def logMelSpectrum(input, samplingrate):
     """
@@ -148,6 +154,7 @@ def main():
     frames = enframe(example['samples'], 400, 200)
     pe = preemp(frames)
     win = windowing(pe)
+    power_spec = powerSpectrum(win,200) # // TODO FIND the value for NFFT
     # print(pe[0])
     # print(example['preemph'][0])
     # print(example['preemph'].shape)
@@ -155,11 +162,9 @@ def main():
     
     plt.figure(1)
     plt.subplot(211)
-    plt.title("frames")
-    plt.plot(win)
+    plt.plot(power_spec[0])
     plt.subplot(212)
-    plt.title("pre-emphasis")
-    plt.plot(example['windowed'])
+    plt.plot(example['spec'][0])
     plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
