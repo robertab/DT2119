@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from more_itertools import windowed
 from scipy.signal import *
 from scipy.fftpack import fft
+from tools import trfbank
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -94,9 +95,7 @@ def powerSpectrum(input, nfft):
         array of power spectra [N x nfft]
     Note: you can use the function fft from scipy.fftpack
     """
-    ps = fft(input,nfft)
-    print(ps)
-    print(ps.shape)
+    ps = np.abs(fft(input, nfft))**2
     return ps
 
 
@@ -114,6 +113,9 @@ def logMelSpectrum(input, samplingrate):
     Note: use the trfbank function provided in tools.py to calculate the filterbank shapes and
           nmelfilters
     """
+    NFFT = input.shape[1]
+    fb = trfbank(samplingrate, NFFT)
+    print(fb.shape)
 
 def cepstrum(input, nceps):
     """
@@ -154,7 +156,9 @@ def main():
     frames = enframe(example['samples'], 400, 200)
     pe = preemp(frames)
     win = windowing(pe)
-    power_spec = powerSpectrum(win,200) # // TODO FIND the value for NFFT
+    power_spec = powerSpectrum(win, 512)
+    # lms = logMelSpectrum(power_spec, 20000)
+
     # print(pe[0])
     # print(example['preemph'][0])
     # print(example['preemph'].shape)
@@ -162,9 +166,9 @@ def main():
     
     plt.figure(1)
     plt.subplot(211)
-    plt.plot(power_spec[0])
-    plt.subplot(212)
-    plt.plot(example['spec'][0])
+    plt.plot(power_spec.T)
+    # plt.subplot(212)
+    # plt.plot(example['spec'].T)
     plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
