@@ -115,7 +115,8 @@ def logMelSpectrum(input, samplingrate):
     """
     NFFT = input.shape[1]
     fb = trfbank(samplingrate, NFFT)
-    print(fb.shape)
+    fb = np.log10(input.dot(fb.T))
+    return fb
 
 def cepstrum(input, nceps):
     """
@@ -148,6 +149,7 @@ def dtw(x, y, dist):
     """
 
 def main():
+    cmap = plt.get_cmap('jet')
     # print("Hello, world!")
     example = np.load('data/lab1_example.npz')['example'].item()
 
@@ -157,7 +159,11 @@ def main():
     pe = preemp(frames)
     win = windowing(pe)
     power_spec = powerSpectrum(win, 512)
-    # lms = logMelSpectrum(power_spec, 20000)
+    lms = logMelSpectrum(power_spec, 20000)
+
+    # plt.pcolormesh(example['spec'])
+    # plt.pcolormesh(frames.T)
+    # plt.pcolormesh(power_spec.T)
 
     # print(pe[0])
     # print(example['preemph'][0])
@@ -166,9 +172,9 @@ def main():
     
     plt.figure(1)
     plt.subplot(211)
-    plt.plot(power_spec.T)
-    # plt.subplot(212)
-    # plt.plot(example['spec'].T)
+    plt.pcolormesh(lms.T, cmap=cmap)
+    plt.subplot(212)
+    plt.pcolormesh(example['mspec'].T, cmap=cmap)
     plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
