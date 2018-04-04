@@ -114,9 +114,9 @@ def logMelSpectrum(input, samplingrate):
           nmelfilters
     """
     NFFT = input.shape[1]
-    fb = trfbank(samplingrate, NFFT)
-    fb = np.log10(input.dot(fb.T))
-    return fb
+    plt.hist(trfbank(samplingrate, NFFT))
+    plt.show()
+    return np.log(input.dot(trfbank(samplingrate, NFFT).T))
 
 def cepstrum(input, nceps):
     """
@@ -169,13 +169,13 @@ def main():
     # print(example['preemph'][0])
     # print(example['preemph'].shape)
     # print(pe.shape)
-    
-    plt.figure(1)
-    plt.subplot(211)
-    plt.pcolormesh(lms.T, cmap=cmap)
-    plt.subplot(212)
-    plt.pcolormesh(example['mspec'].T, cmap=cmap)
-    plt.show()
+
+    # plt.figure(1)
+    # plt.subplot(211)
+    # plt.pcolormesh(lms.T, cmap=cmap)
+    # plt.subplot(212)
+    # plt.pcolormesh(example['mspec'].T, cmap=cmap)
+    # plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
     ## print(frames[1])
