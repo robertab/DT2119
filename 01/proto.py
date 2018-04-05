@@ -4,6 +4,8 @@ from more_itertools import windowed
 from scipy.signal import *
 from scipy.fftpack import fft
 from tools import trfbank
+from scipy.fftpack.realtransforms import dct
+from tools import lifter
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -114,8 +116,6 @@ def logMelSpectrum(input, samplingrate):
           nmelfilters
     """
     NFFT = input.shape[1]
-    plt.hist(trfbank(samplingrate, NFFT))
-    plt.show()
     return np.log(input.dot(trfbank(samplingrate, NFFT).T))
 
 def cepstrum(input, nceps):
@@ -130,6 +130,7 @@ def cepstrum(input, nceps):
         array of Cepstral coefficients [N x nceps]
     Note: you can use the function dct from scipy.fftpack.realtransforms
     """
+    return dct(input, type=2, axis=1, norm='ortho')[:,:nceps]
 
 def dtw(x, y, dist):
     """Dynamic Time Warping.
@@ -147,6 +148,49 @@ def dtw(x, y, dist):
 
     Note that you only need to define the first output for this exercise.
     """
+def plot_features(data):
+    # NOW DO FOR ALL DATA
+    plt.figure(1)
+    plt.title('lifted cosine transform')
+    c = 1
+    for d in data:
+        if d['digit']=='4':
+            print(d['gender'])
+            plt.subplot(410+c)
+            mfcc_data = mfcc(d['samples'])
+            plt.pcolormesh(mfcc_data.T, cmap=cmap)
+#             plt.plot(mfcc_data)
+            print(mfcc_data.shape)
+            c+=1
+    plt.figure(2)
+    c = 1
+    j= 1
+    for d in data:
+        if d['digit']=='4':
+            print(d['gender'])
+            plt.subplot(410+c)
+            mfcc_data = mfcc(d['samples'])
+            print(mfcc_data.shape)
+            plt.plot(mfcc_data[:,7])
+            c+=1
+    plt.show()
+
+def correlations(data):
+    utterances = np.empty((0,13))
+    for d in data:
+        utterances = np.concatenate((utterances, mfcc(d['samples'])),axis=0)
+    return np.corrcoef(utterances.T)
+
+def plot_cov(cov_mat):
+    cmap = plt.get_cmap('jet')
+    plt.pcolormesh(cov_mat, cmap=cmap)
+    plt.title('Correlation Matrix')
+    plt.xlabel('features')
+    plt.ylabel('features')
+    plt.axis([0,12,12,0])
+    plt.show()
+
+
 
 def main():
     cmap = plt.get_cmap('jet')
@@ -155,26 +199,32 @@ def main():
 
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
-    frames = enframe(example['samples'], 400, 200)
-    pe = preemp(frames)
-    win = windowing(pe)
-    power_spec = powerSpectrum(win, 512)
-    lms = logMelSpectrum(power_spec, 20000)
 
-    # plt.pcolormesh(example['spec'])
-    # plt.pcolormesh(frames.T)
-    # plt.pcolormesh(power_spec.T)
+    # TEST FOR CORRECT CALCULATIONS    
+#     frames = enframe(example['samples'], 400, 200)
+#     pe = preemp(frames)
+#     win = windowing(pe)
+#     power_spec = powerSpectrum(win, 512)
+#     lms = logMelSpectrum(power_spec, 20000)
+#     mfcc = cepstrum(lms,13)
+#     lmfcc = lifter(mfcc)
 
-    # print(pe[0])
-    # print(example['preemph'][0])
-    # print(example['preemph'].shape)
-    # print(pe.shape)
+#     plot_features(data)          
+    cov_mat = correlations(data)
+    plot_cov(cov_mat)
 
-    # plt.figure(1)
-    # plt.subplot(211)
-    # plt.pcolormesh(lms.T, cmap=cmap)
-    # plt.subplot(212)
-    # plt.pcolormesh(example['mspec'].T, cmap=cmap)
+   #     lmfcc_data = mfcc(data)
+#     print(lmfcc_data.shape)
+
+
+#     plt.figure(1)
+#     plt.subplot(211)
+#     plt.title('discrete cosine transform')
+#     plt.pcolormesh(mfcc.T, cmap=cmap)
+#     plt.subplot(212)
+#     plt.title('Sinusodial lifting of the cosine transform')
+#     plt.pcolormesh(lmfcc.T, cmap=cmap)
+
     # plt.show()
     # print(len(example['samples']))
     # print(np.sum(frames - example['frames']))
@@ -184,7 +234,6 @@ def main():
 #     plt.figure()
 
 #     plt.pcolormesh(pe) 
-#     plt.show()
 
     # hm = windowing(pe)
 
