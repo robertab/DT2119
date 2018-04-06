@@ -137,7 +137,7 @@ def dtw(x, y, dist):
 
     Args:
         x, y: arrays of size NxD and MxD respectively, where D is the dimensionality
-              and N, M are the respective lenghts of the sequences
+              and N, M are the respective lengths of the sequences
         dist: distance function (can be used in the code as dist(x[i], y[j]))
 
     Outputs:
@@ -148,6 +148,28 @@ def dtw(x, y, dist):
 
     Note that you only need to define the first output for this exercise.
     """
+    something = None 
+    N, D = x.shape[0], 13
+    M, D = y.shape[0], 13
+    # d = dist(x, y) / len(x) + len(y)
+    LD = np.zeros((N, M))
+    AD = np.zeros((N, M))
+    path = []
+    # Initialize the dynamic programming algorithm
+    for i, x_frame in enumerate(x):
+        for j, y_frame in enumerate(y):
+            LD[i, j] = dist(x_frame, y_frame)
+
+    AD[0, :], AD[:, 0] = LD[0, :], LD[:, 0]
+    for i in range(1, AD.shape[0]):
+
+        for j in range(1, AD.shape[1]):
+            AD[i, j] = min(AD[i, j-1], AD[i-1, j], AD[i-1, j-1])
+
+            
+def euclidean(x, y):
+    return np.sqrt(np.sum((x - y)**2))
+        
 def plot_features(data):
     # NOW DO FOR ALL DATA
     plt.figure(1)
@@ -175,10 +197,19 @@ def plot_features(data):
             c+=1
     plt.show()
 
-def correlations(data):
+def correlations(data, sampling_rate=20000, lift=False):
     utterances = np.empty((0,13))
     for d in data:
-        utterances = np.concatenate((utterances, mfcc(d['samples'])),axis=0)
+        if not lift:
+            frames = enframe(d['samples'], 400, 200)
+            preemph = preemp(frames, 0.97)
+            windowed = windowing(preemph)
+            spec = powerSpectrum(windowed, 512)
+            mspec = logMelSpectrum(spec, sampling_rate)
+            ceps = cepstrum(mspec, 13)
+            utterances = np.concatenate((utterances, mspec),axis=0)
+        else:
+            utterances = np.concatenate((utterances, mfcc(d['samples'])),axis=0)
     return np.corrcoef(utterances.T)
 
 def plot_cov(cov_mat):
@@ -188,6 +219,7 @@ def plot_cov(cov_mat):
     plt.xlabel('features')
     plt.ylabel('features')
     plt.axis([0,12,12,0])
+    plt.colorbar()    
     plt.show()
 
 
@@ -200,20 +232,31 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
 
+    ex1 = data[0]['samples']
+    ex2 = data[0]['samples']
+
+    dtw(ex1, ex2, euclidean)
+    
+
     # TEST FOR CORRECT CALCULATIONS    
-#     frames = enframe(example['samples'], 400, 200)
-#     pe = preemp(frames)
-#     win = windowing(pe)
-#     power_spec = powerSpectrum(win, 512)
-#     lms = logMelSpectrum(power_spec, 20000)
-#     mfcc = cepstrum(lms,13)
-#     lmfcc = lifter(mfcc)
+    # pe = preemp(frames)
+    # win = windowing(pe)
+    # power_spec = powerSpectrum(win, 512)
+    # lms = logMelSpectrum(power_spec, 20000)
+    # mfcc = cepstrum(lms,13)
 
-#     plot_features(data)          
-    cov_mat = correlations(data)
-    plot_cov(cov_mat)
+    # frames = enframe(data, 400, 200)
+    # pe = preemp(frames)
+    # print(pe.shape)
+    # win = windowing(pe)
+    # power_spec = powerSpectrum(win, 512)
+    # lms = logMelSpectrum(power_spec, 20000)
+    # lift = False
+    # cov_mat = correlations(data, 20000, lift)
+    # plot_cov(cov_mat)
 
-   #     lmfcc_data = mfcc(data)
+
+#     lmfcc_data = mfcc(data)
 #     print(lmfcc_data.shape)
 
 
