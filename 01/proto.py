@@ -166,7 +166,7 @@ def dtw(x, y, dist):
         for j in range(1, AD.shape[1]):
             AD[i, j] = min(AD[i, j-1], AD[i-1, j], AD[i-1, j-1])
 
-            
+    return AD     
 def euclidean(x, y):
     return np.sqrt(np.sum((x - y)**2))
         
@@ -232,10 +232,29 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
 
+    # FIRST VECTOR
     ex1 = data[0]['samples']
-    ex2 = data[0]['samples']
+    frames = enframe(ex1, 400, 200)
+    preemph = preemp(frames, 0.97)
+    windowed = windowing(preemph)
+    spec = powerSpectrum(windowed, 512)
+    mspec1 = logMelSpectrum(spec, 20000)
+    ceps1 = cepstrum(mspec1, 13)
 
-    dtw(ex1, ex2, euclidean)
+    # SECOND VECTOR
+    ex2 = data[1]['samples']
+    frames = enframe(ex2, 400, 200)
+    preemph = preemp(frames, 0.97)
+    windowed = windowing(preemph)
+    spec = powerSpectrum(windowed, 512)
+    mspec2 = logMelSpectrum(spec, 20000)
+    ceps2 = cepstrum(mspec2, 13)
+
+    ## DYNAMIC TIME WARPING
+    # TODO: The vectors are of differnet size....
+    AD = dtw(ceps1, ceps2, euclidean)
+    print(AD)
+
     
 
     # TEST FOR CORRECT CALCULATIONS    
