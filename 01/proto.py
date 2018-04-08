@@ -6,6 +6,8 @@ from scipy.fftpack import fft
 from tools import trfbank
 from scipy.fftpack.realtransforms import dct
 from tools import lifter
+import sys
+np.set_printoptions(threshold=np.nan)
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -151,36 +153,51 @@ def dtw(x, y, dist):
     N = x.shape[0]
     M = y.shape[0]
     # d = dist(x, y) / (len(x) + len(y))
-    LD = AD = np.zeros((N, M))
-    path = []
+    LD = np.zeros((N, M))
+    AD = np.zeros((N, M))
+#     path_mat = np.zeros((N,M))
+    path_mat = []
     # Initialize the dynamic programming algorithm
     # Start out by filling a matrix of local distance values
     # between each frame.
     for i, x_frame in enumerate(x):
         for j, y_frame in enumerate(y):
             LD[i, j] = dist(x_frame, y_frame)
-    AD[0, :], AD[:, 0] = LD[0, :], LD[:, 0]
+    
+#     AD[:,:] = sys.maxsize
+
     nrows, ncols = AD.shape
+    # set first row
+    for row in range(1,nrows):
+        AD[row,0] = AD[row-1,0]+LD[row,0]
+
+    # set first col
+    for col in range(1,ncols):
+        AD[0,col] = AD[0,col-1] + LD[0,col]
+
     for row in range(1, nrows): # Start from 1 to avoid out of bounds
         for col in range(1, ncols):
             minimum_dist = LD[row, col] + min(AD[row, col-1],   # To the left
                                               AD[row-1, col],   # Above 
                                               AD[row-1, col-1]) # The diagonal
             AD[row, col] = minimum_dist
-            # TODO: Need to figure out how to store the path
+    
 
-    # Procedure to return the optimal path
-    min_idx = -1
-    for row in range(1, nrows):
-        for col in range(1, ncols):
-            if AD[row-1, col-1] < AD[row, col-1]:
-                min_idx = (row-1, col-1) if AD[row-1, col-1] < AD[row-1, col] else (row-1, col)
-            else:
-                min_idx = (row, col-1) if AD[row, col-1] < AD[row-1, col] else (row-1, col)
-            path.append(min_idx)
-    return LD, AD, path
+    backtracking = True
+    i, j = nrows-1, ncols-1
+    path_mat.append((i,j))
+    while backtracking:
+        min_dist =  min(AD[i, j-1],    
+                        AD[i-1, j],   
+                        AD[i-1, j-1])
+        min_idx = np.where(AD==min_dist)
+        i, j = min_idx[0][0], min_idx[1][0]
+        path_mat.append((i,j))
+        if i == 0 and j == 0:
+            backtracking = False
+       
+    return LD, AD, path_mat
 
-    return AD     
 def euclidean(x, y):
     return np.sqrt(np.sum((x - y)**2))
         
@@ -246,10 +263,15 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
 
-<<<<<<< HEAD
     ex1 = mfcc(data[0]['samples'])
     ex2 = mfcc(data[1]['samples'])
 
+    LD, AD, path = dtw(ex1,ex2,euclidean)
+    print(path)
+    x = [x[0] for x in path]
+    y = [x[1] for x in path]
+    plt.plot(x,y)
+    plt.show()
     
 
     # TEST FOR CORRECT CALCULATIONS    
