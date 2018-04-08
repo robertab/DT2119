@@ -195,7 +195,7 @@ def dtw(x, y, dist):
         path_mat.append((i,j))
         if i == 0 and j == 0:
             backtracking = False
-    global_dist = np.sum(AD)
+    global_dist = np.sum(AD) / (len(x) + len(y))
     return LD, AD, path_mat, global_dist
 
 def euclidean(x, y):
