@@ -152,10 +152,9 @@ def dtw(x, y, dist):
     """
     N = x.shape[0]
     M = y.shape[0]
-    # d = dist(x, y) / (len(x) + len(y))
+    global_dist = 0
     LD = np.zeros((N, M))
     AD = np.zeros((N, M))
-#     path_mat = np.zeros((N,M))
     path_mat = []
     # Initialize the dynamic programming algorithm
     # Start out by filling a matrix of local distance values
@@ -163,8 +162,6 @@ def dtw(x, y, dist):
     for i, x_frame in enumerate(x):
         for j, y_frame in enumerate(y):
             LD[i, j] = dist(x_frame, y_frame)
-    
-#     AD[:,:] = sys.maxsize
 
     nrows, ncols = AD.shape
     # set first row
@@ -182,7 +179,6 @@ def dtw(x, y, dist):
                                               AD[row-1, col-1]) # The diagonal
             AD[row, col] = minimum_dist
     
-
     backtracking = True
     i, j = nrows-1, ncols-1
     path_mat.append((i,j))
@@ -195,12 +191,23 @@ def dtw(x, y, dist):
         path_mat.append((i,j))
         if i == 0 and j == 0:
             backtracking = False
+
     global_dist = np.sum(AD) / (len(x) + len(y))
     return LD, AD, path_mat, global_dist
 
 def euclidean(x, y):
     return np.sqrt(np.sum((x - y)**2))
-        
+ 
+def get_global_dist(data):
+    GD = np.zeros((44,44))
+    row, col = GD.shape
+    for i in range(row):
+        x = mfcc(data[i]['samples'])
+        for j in range(col):
+            y = mfcc(data[i]['samples'])
+            _, _, _, GD[i,j] = dtw(x,y,euclidean)
+    return GD
+
 def plot_features(data):
     # NOW DO FOR ALL DATA
     plt.figure(1)
@@ -271,8 +278,11 @@ def main():
     print(d)
     x = [x[0] for x in path]
     y = [x[1] for x in path]
-    plt.plot(x,y)
-    plt.show()
+#     plt.plot(x,y)
+#     plt.show()
+    
+    GD = get_global_dist(data[:2])
+    print(GD)
     
 
     # TEST FOR CORRECT CALCULATIONS    
