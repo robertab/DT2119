@@ -180,7 +180,7 @@ def dtw(x, y, dist):
             path.append(min_idx)
     return LD, AD, path
 
-            
+    return AD     
 def euclidean(x, y):
     return np.sqrt(np.sum((x - y)**2))
         
@@ -246,10 +246,10 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
 
+<<<<<<< HEAD
     ex1 = mfcc(data[0]['samples'])
     ex2 = mfcc(data[1]['samples'])
 
-    dtw(ex1, ex2, euclidean)
     
 
     # TEST FOR CORRECT CALCULATIONS    
