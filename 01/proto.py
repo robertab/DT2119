@@ -195,8 +195,8 @@ def dtw(x, y, dist):
         path_mat.append((i,j))
         if i == 0 and j == 0:
             backtracking = False
-       
-    return LD, AD, path_mat
+    global_dist = np.sum(AD)
+    return LD, AD, path_mat, global_dist
 
 def euclidean(x, y):
     return np.sqrt(np.sum((x - y)**2))
@@ -266,8 +266,9 @@ def main():
     ex1 = mfcc(data[0]['samples'])
     ex2 = mfcc(data[1]['samples'])
 
-    LD, AD, path = dtw(ex1,ex2,euclidean)
+    LD, AD, path, d = dtw(ex1,ex2,euclidean)
     print(path)
+    print(d)
     x = [x[0] for x in path]
     y = [x[1] for x in path]
     plt.plot(x,y)
