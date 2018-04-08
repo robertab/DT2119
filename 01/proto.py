@@ -148,23 +148,37 @@ def dtw(x, y, dist):
 
     Note that you only need to define the first output for this exercise.
     """
-    something = None 
-    N, D = x.shape[0], 13
-    M, D = y.shape[0], 13
-    # d = dist(x, y) / len(x) + len(y)
-    LD = np.zeros((N, M))
-    AD = np.zeros((N, M))
+    N = x.shape[0]
+    M = y.shape[0]
+    # d = dist(x, y) / (len(x) + len(y))
+    LD = AD = np.zeros((N, M))
     path = []
     # Initialize the dynamic programming algorithm
+    # Start out by filling a matrix of local distance values
+    # between each frame.
     for i, x_frame in enumerate(x):
         for j, y_frame in enumerate(y):
             LD[i, j] = dist(x_frame, y_frame)
-
     AD[0, :], AD[:, 0] = LD[0, :], LD[:, 0]
-    for i in range(1, AD.shape[0]):
+    nrows, ncols = AD.shape
+    for row in range(1, nrows): # Start from 1 to avoid out of bounds
+        for col in range(1, ncols):
+            minimum_dist = LD[row, col] + min(AD[row, col-1],   # To the left
+                                              AD[row-1, col],   # Above 
+                                              AD[row-1, col-1]) # The diagonal
+            AD[row, col] = minimum_dist
+            # TODO: Need to figure out how to store the path
 
-        for j in range(1, AD.shape[1]):
-            AD[i, j] = min(AD[i, j-1], AD[i-1, j], AD[i-1, j-1])
+    # Procedure to return the optimal path
+    min_idx = -1
+    for row in range(1, nrows):
+        for col in range(1, ncols):
+            if AD[row-1, col-1] < AD[row, col-1]:
+                min_idx = (row-1, col-1) if AD[row-1, col-1] < AD[row-1, col] else (row-1, col)
+            else:
+                min_idx = (row, col-1) if AD[row, col-1] < AD[row-1, col] else (row-1, col)
+            path.append(min_idx)
+    return LD, AD, path
 
             
 def euclidean(x, y):
@@ -232,8 +246,8 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
 
-    ex1 = data[0]['samples']
-    ex2 = data[0]['samples']
+    ex1 = mfcc(data[0]['samples'])
+    ex2 = mfcc(data[1]['samples'])
 
     dtw(ex1, ex2, euclidean)
     
