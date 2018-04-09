@@ -285,17 +285,23 @@ def main():
 
     # ***** GAUSSIAN MIXTURE MODEL *****
 
-    # Extract test number
+    # Get test data for one digit
     test_data = select_number(data, '7')
-    print(test_data.shape)
+    # Train data on all utterances
     mfcc_mat = concatenate_data(data)
     # Create model
-    gmm = GaussianMixture(8, covariance_type='spherical')
+    gmm = GaussianMixture(4, covariance_type='spherical', verbose=1)
     # Train on all data
     gmm.fit(mfcc_mat)
     # Predict on #7
+
     y = gmm.predict_proba(test_data)
-    plt.plot(y.T)
+    cols = ['r', 'b', 'y', 'g']
+    print(y.shape)
+    colors = [cols[i] for i in gmm.predict(test_data)]
+    plt.gca()
+    # plt.scatter(mfcc_mat[:,:], c=colors)
+    plt.scatter(mfcc_mat[:, 0], mfcc_mat[:, 1], mfcc_mat[:, 2], c=colors)
     plt.show()
     # **********************************
 
