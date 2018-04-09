@@ -2,7 +2,7 @@ import numpy as np
 # DT2119, Lab 1 Feature Extraction
 # - Functions given by the exercise -------------------------------------------- 
 
-def tidigit2labels(tidigitsarray):
+def todigit2labels(tidigitsarray):
     """
     Return a list of labels including gender, speaker, digit and repetition information for each
     utterance in tidigitsarray. Useful for plots.

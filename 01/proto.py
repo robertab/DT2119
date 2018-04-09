@@ -5,8 +5,9 @@ from scipy.signal import *
 from scipy.fftpack import fft
 from tools import trfbank
 from scipy.fftpack.realtransforms import dct
-from tools import lifter, tidigit2labels
+from tools import lifter, todigit2labels
 from scipy.cluster.hierarchy import linkage, dendrogram
+from sklearn.mixture import GaussianMixture
 import sys
 np.set_printoptions(threshold=np.nan)
 # import more_itertools.windowed
@@ -162,6 +163,12 @@ def plot_features(data):
             c+=1
     plt.show()
 
+def concatenate_data(data):
+    utterances = np.empty((0, 13))
+    for d in data:
+        utterances = np.concatenate((utterances, mfcc(d['samples'])), axis=0)
+    return utterances
+
 def correlations(data, sampling_rate=20000, lift=False):
     utterances = np.empty((0,13))
     for d in data:
@@ -261,6 +268,13 @@ def get_global_dist(data):
             _, _, _, GD[i,j] = dtw(x,y,euclidean)
     return GD
 
+def select_number(data, digit):
+    X_test = np.empty((0, 13))
+    for d in data:
+        if d['digit'] == digit:
+            X_test = np.concatenate((X_test, mfcc(d['samples'])), axis=0)
+    return X_test
+
 def main():
     cmap = plt.get_cmap('jet')
     # print("Hello, world!")
@@ -269,29 +283,63 @@ def main():
     # Data contains array of dictionaries
     data = np.load('data/lab1_data.npz')['data']
 
-    ex1 = mfcc(data[0]['samples'])
-    ex2 = mfcc(data[1]['samples'])
-    ex3 = mfcc(data[2]['samples'])
-    ex4 = mfcc(data[3]['samples'])
+    # ***** GAUSSIAN MIXTURE MODEL *****
 
-    LD, AD, path, d1 = dtw(ex1,ex2,euclidean)
-    x = [x[0] for x in path]
-    y = [x[1] for x in path]
-    plt.plot(x,y) # plot the path in the Accumulated distance matrix
-    plt.pcolormesh(AD, cmap=cmap)
+    # Extract test number
+    test_data = select_number(data, '7')
+    print(test_data.shape)
+    mfcc_mat = concatenate_data(data)
+    # Create model
+    gmm = GaussianMixture(8, covariance_type='spherical')
+    # Train on all data
+    gmm.fit(mfcc_mat)
+    # Predict on #7
+    y = gmm.predict_proba(test_data)
+    plt.plot(y.T)
     plt.show()
+    # **********************************
+
+    # test_data = []
+    # for d in data:
+    #     if d['digit'] == '7':
+    #         print(d['gender'])
+    #         test_data.append((mfcc(d['samples']), d['gender'], d['digit']))
+
+
+    # LD, AD, path, global_dist = dtw(test_data[0][0], test_data[2][0], euclidean)
+    # x = [x[0] for x in path]
+    # y = [x[1] for x in path]
+    # plt.title("Best path for minimum distortion between two utterances")
+    # plt.xlabel("Utterance for digit {} spoken by {}".format(str(test_data[0][2]), test_data[0][1]))
+    # plt.ylabel("Utterance for digit {} spoken by {}".format(str(test_data[2][2]), test_data[2][1]))
+    # plt.plot(x, y, c='r')
+    # # plt.pcolormesh(AD, cmap=cmap)
+    # plt.show()
+
+
+
+    # ex1 = mfcc(data[0]['samples'])
+    # ex2 = mfcc(data[1]['samples'])
+    # ex3 = mfcc(data[2]['samples'])
+    # ex4 = mfcc(data[3]['samples'])
+
+    # LD, AD, path, d1 = dtw(ex1,ex2,euclidean)
+    # x = [x[0] for x in path]
+    # y = [x[1] for x in path]
+    # plt.plot(x,y) # plot the path in the Accumulated distance matrix
+    # plt.pcolormesh(AD, cmap=cmap)
+    # plt.show()
+    # 
+    # labels = todigit2labels(data)    
+    # print(labels)
     
-    labels = tidigit2labels(data)    
-    print(labels)
-    
-    GD = get_global_dist(data)
-    print(GD)
-    plot_cov(GD)
-    clusters = linkage(GD,method='complete')
-    print(clusters)
-    dendrogram(clusters, leaf_label_func=tidigit2labels)
-    plt.show()
-    dendrogram(clusters, leaf_label_func=tidigit2labels(data))
+    # GD = get_global_dist(data)
+    # Hierarchy clustering. Clusering based on MAX distance
+    # clusters = linkage(GD,method='complete')
+    # 
+    # dendrogram(clusters, labels=labels)
+    # plt.show()
+    # dendrogram(clusters, leaf_label_func=tidigit2labels(data))
     
 
     # TEST FOR CORRECT CALCULATIONS    
