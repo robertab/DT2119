@@ -5,7 +5,8 @@ from scipy.signal import *
 from scipy.fftpack import fft
 from tools import trfbank
 from scipy.fftpack.realtransforms import dct
-from tools import lifter
+from tools import lifter, tidigit2labels
+from scipy.cluster.hierarchy import linkage, dendrogram
 import sys
 np.set_printoptions(threshold=np.nan)
 # import more_itertools.windowed
@@ -134,80 +135,6 @@ def cepstrum(input, nceps):
     """
     return dct(input, type=2, axis=1, norm='ortho')[:,:nceps]
 
-def dtw(x, y, dist):
-    """Dynamic Time Warping.
-
-    Args:
-        x, y: arrays of size NxD and MxD respectively, where D is the dimensionality
-              and N, M are the respective lengths of the sequences
-        dist: distance function (can be used in the code as dist(x[i], y[j]))
-
-    Outputs:
-        d: global distance between the sequences (scalar) normalized to len(x)+len(y)
-        LD: local distance between frames from x and y (NxM matrix)
-        AD: accumulated distance between frames of x and y (NxM matrix)
-        path: best path thtough AD
-
-    Note that you only need to define the first output for this exercise.
-    """
-    N = x.shape[0]
-    M = y.shape[0]
-    global_dist = 0
-    LD = np.zeros((N, M))
-    AD = np.zeros((N, M))
-    path_mat = []
-    # Initialize the dynamic programming algorithm
-    # Start out by filling a matrix of local distance values
-    # between each frame.
-    for i, x_frame in enumerate(x):
-        for j, y_frame in enumerate(y):
-            LD[i, j] = dist(x_frame, y_frame)
-
-    nrows, ncols = AD.shape
-    # set first row
-    for row in range(1,nrows):
-        AD[row,0] = AD[row-1,0]+LD[row,0]
-
-    # set first col
-    for col in range(1,ncols):
-        AD[0,col] = AD[0,col-1] + LD[0,col]
-
-    for row in range(1, nrows): # Start from 1 to avoid out of bounds
-        for col in range(1, ncols):
-            minimum_dist = LD[row, col] + min(AD[row, col-1],   # To the left
-                                              AD[row-1, col],   # Above 
-                                              AD[row-1, col-1]) # The diagonal
-            AD[row, col] = minimum_dist
-    
-    backtracking = True
-    i, j = nrows-1, ncols-1
-    path_mat.append((i,j))
-    while backtracking:
-        min_dist =  min(AD[i, j-1],    
-                        AD[i-1, j],   
-                        AD[i-1, j-1])
-        min_idx = np.where(AD==min_dist)
-        i, j = min_idx[0][0], min_idx[1][0]
-        path_mat.append((i,j))
-        if i == 0 and j == 0:
-            backtracking = False
-
-    global_dist = np.sum(AD) / (len(x) + len(y))
-    return LD, AD, path_mat, global_dist
-
-def euclidean(x, y):
-    return np.sqrt(np.sum((x - y)**2))
- 
-def get_global_dist(data):
-    GD = np.zeros((44,44))
-    row, col = GD.shape
-    for i in range(row):
-        x = mfcc(data[i]['samples'])
-        for j in range(col):
-            y = mfcc(data[i]['samples'])
-            _, _, _, GD[i,j] = dtw(x,y,euclidean)
-    return GD
-
 def plot_features(data):
     # NOW DO FOR ALL DATA
     plt.figure(1)
@@ -260,7 +187,79 @@ def plot_cov(cov_mat):
     plt.colorbar()    
     plt.show()
 
+def dtw(x, y, dist):
+    """Dynamic Time Warping.
 
+    Args:
+        x, y: arrays of size NxD and MxD respectively, where D is the dimensionality
+              and N, M are the respective lengths of the sequences
+        dist: distance function (can be used in the code as dist(x[i], y[j]))
+
+    Outputs:
+        d: global distance between the sequences (scalar) normalized to len(x)+len(y)
+        LD: local distance between frames from x and y (NxM matrix)
+        AD: accumulated distance between frames of x and y (NxM matrix)
+        path: best path thtough AD
+
+    Note that you only need to define the first output for this exercise.
+    """
+    N = x.shape[0]
+    M = y.shape[0]
+    global_dist = 0
+    LD = np.zeros((N, M))
+    AD = np.zeros((N, M))
+    path_mat = []
+    # Initialize the dynamic programming algorithm
+    # Start out by filling a matrix of local distance values
+    # between each frame.
+    for i, x_frame in enumerate(x):
+        for j, y_frame in enumerate(y):
+            LD[i, j] = dist(x_frame, y_frame)
+
+    nrows, ncols = AD.shape
+    # set first row
+    for row in range(1,nrows):
+        AD[row,0] = AD[row-1,0]+LD[row,0]
+    # set first col
+    for col in range(1,ncols):
+        AD[0,col] = AD[0,col-1] + LD[0,col]
+
+    for row in range(1, nrows): # Start from 1 to avoid out of bounds
+        for col in range(1, ncols):
+            minimum_dist = LD[row, col] + min(AD[row, col-1],   # To the left
+                                              AD[row-1, col],   # Above 
+                                              AD[row-1, col-1]) # The diagonal
+            AD[row, col] = minimum_dist
+    
+    backtracking = True
+    i, j = nrows-1, ncols-1
+    path_mat.append((i,j))
+    while backtracking:
+        min_dist =  min(AD[i, j-1],    
+                        AD[i-1, j],   
+                        AD[i-1, j-1])
+        min_idx = np.where(AD==min_dist)
+        i, j = min_idx[0][0], min_idx[1][0]
+        path_mat.append((i,j))
+        if i == 0 and j == 0:
+            backtracking = False
+
+    global_dist = AD[nrows-1,ncols-1] / (len(x) + len(y))
+    return LD, AD, path_mat, global_dist
+
+def euclidean(x, y):
+    return np.sqrt(np.sum((x - y)**2))
+ 
+def get_global_dist(data):
+    N = data.shape[0]
+    GD = np.zeros((N,N))
+    row, col = GD.shape
+    for i in range(row):
+        x = mfcc(data[i]['samples'])
+        for j in range(col):
+            y = mfcc(data[j]['samples'])
+            _, _, _, GD[i,j] = dtw(x,y,euclidean)
+    return GD
 
 def main():
     cmap = plt.get_cmap('jet')
@@ -272,17 +271,27 @@ def main():
 
     ex1 = mfcc(data[0]['samples'])
     ex2 = mfcc(data[1]['samples'])
+    ex3 = mfcc(data[2]['samples'])
+    ex4 = mfcc(data[3]['samples'])
 
-    LD, AD, path, d = dtw(ex1,ex2,euclidean)
-    print(path)
-    print(d)
+    LD, AD, path, d1 = dtw(ex1,ex2,euclidean)
     x = [x[0] for x in path]
     y = [x[1] for x in path]
-#     plt.plot(x,y)
-#     plt.show()
+    plt.plot(x,y) # plot the path in the Accumulated distance matrix
+    plt.pcolormesh(AD, cmap=cmap)
+    plt.show()
     
-    GD = get_global_dist(data[:2])
+    labels = tidigit2labels(data)    
+    print(labels)
+    
+    GD = get_global_dist(data)
     print(GD)
+    plot_cov(GD)
+    clusters = linkage(GD,method='complete')
+    print(clusters)
+    dendrogram(clusters, leaf_label_func=tidigit2labels)
+    plt.show()
+    dendrogram(clusters, leaf_label_func=tidigit2labels(data))
     
 
     # TEST FOR CORRECT CALCULATIONS    
