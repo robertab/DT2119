@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import cm,mlab
 from more_itertools import windowed
 from scipy.signal import *
 from scipy.fftpack import fft
@@ -10,6 +11,7 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 from sklearn.mixture import GaussianMixture
 import sys
 np.set_printoptions(threshold=np.nan)
+np.random.seed(19860330)
 # import more_itertools.windowed
 
 # DT2119, Lab 1 Feature Extraction
@@ -55,7 +57,7 @@ def enframe(samples, winlen, winshift):
     """
     return np.asarray(list(windowed(samples, winlen, step=winshift, fillvalue=0)))
 
-    
+
 def preemp(input, p=0.97):
     """
     Pre-emphasis filter.
@@ -69,8 +71,8 @@ def preemp(input, p=0.97):
         output: array of pre-emphasised speech samples
     Note (you can use the function lfilter from scipy.signal)
     """
-    A = [1] 
-    B = [1, -p] 
+    A = [1]
+    B = [1, -p]
     return lfilter(B,A, input, axis=1)
 
 def windowing(input):
@@ -185,13 +187,14 @@ def correlations(data, sampling_rate=20000, lift=False):
     return np.corrcoef(utterances.T)
 
 def plot_cov(cov_mat):
+    print(cov_mat.shape)
     cmap = plt.get_cmap('jet')
     plt.pcolormesh(cov_mat, cmap=cmap)
     plt.title('Correlation Matrix')
     plt.xlabel('features')
     plt.ylabel('features')
     plt.axis([0,12,12,0])
-    plt.colorbar()    
+    plt.colorbar()
     plt.show()
 
 def dtw(x, y, dist):
@@ -234,16 +237,16 @@ def dtw(x, y, dist):
     for row in range(1, nrows): # Start from 1 to avoid out of bounds
         for col in range(1, ncols):
             minimum_dist = LD[row, col] + min(AD[row, col-1],   # To the left
-                                              AD[row-1, col],   # Above 
+                                              AD[row-1, col],   # Above
                                               AD[row-1, col-1]) # The diagonal
             AD[row, col] = minimum_dist
-    
+
     backtracking = True
     i, j = nrows-1, ncols-1
     path_mat.append((i,j))
     while backtracking:
-        min_dist =  min(AD[i, j-1],    
-                        AD[i-1, j],   
+        min_dist =  min(AD[i, j-1],
+                        AD[i-1, j],
                         AD[i-1, j-1])
         min_idx = np.where(AD==min_dist)
         i, j = min_idx[0][0], min_idx[1][0]
@@ -256,7 +259,7 @@ def dtw(x, y, dist):
 
 def euclidean(x, y):
     return np.sqrt(np.sum((x - y)**2))
- 
+
 def get_global_dist(data):
     N = data.shape[0]
     GD = np.zeros((N,N))
@@ -270,9 +273,16 @@ def get_global_dist(data):
 
 def select_number(data, digit):
     X_test = np.empty((0, 13))
+    c = 0
     for d in data:
-        if d['digit'] == digit:
+        if d['digit'] == digit and d['speaker'] == 'bm' and d['repetition'] == 'a' and d['gender'] == 'man':
+            print(d['digit'], d['speaker'], d['repetition'], d['gender'])
             X_test = np.concatenate((X_test, mfcc(d['samples'])), axis=0)
+            c+=1
+#         elif d['digit'] == digit and d['speaker'] == 'ew' and d['repetition'] == 'b':
+#             print(d['digit'], d['speaker'], d['repetition'], d['gender'])
+#             X_test = np.concatenate((X_test, mfcc(d['samples'])), axis=0)
+
     return X_test
 
 def main():
@@ -286,23 +296,68 @@ def main():
     # ***** GAUSSIAN MIXTURE MODEL *****
 
     # Get test data for one digit
-    test_data = select_number(data, '7')
+    test_data_7 = select_number(data, '7')
+#     test_data = np.concatenate((test_data,select_number(data, '9')))
     # Train data on all utterances
     mfcc_mat = concatenate_data(data)
-    # Create model
-    gmm = GaussianMixture(4, covariance_type='spherical', verbose=1)
-    # Train on all data
-    gmm.fit(mfcc_mat)
-    # Predict on #7
 
-    y = gmm.predict_proba(test_data)
-    cols = ['r', 'b', 'y', 'g']
-    print(y.shape)
-    colors = [cols[i] for i in gmm.predict(test_data)]
-    plt.gca()
-    # plt.scatter(mfcc_mat[:,:], c=colors)
-    plt.scatter(mfcc_mat[:, 0], mfcc_mat[:, 1], mfcc_mat[:, 2], c=colors)
-    plt.show()
+    components = [4,8,16,32]
+    for c in components:
+        # Create model
+        gmm = GaussianMixture(c, covariance_type='diag',max_iter=1000, verbose=1)
+        # Train on all data
+        gmm.fit(mfcc_mat)
+        # Predict on #7
+        y_7 = gmm.predict_proba(test_data_7)
+        y_idx_7 = gmm.predict(test_data_7)
+        print(y_7.shape)
+        print(len(y_idx_7))
+        print('pred idx_7:' + str(y_idx_7))
+        cov = gmm.covariances_
+        means = gmm.means_
+        
+        import scipy.stats
+        x_axis=np.arange(-200,200,1)
+#         fig ,ax = plt.subplots(c,13)
+        for i in range(c):
+            for j in range(means.shape[1]):
+                plt.plot(scipy.stats.norm.pdf(x_axis,means[i,j],cov[i,j]))
+#                 plt.plot(scipy.stats.norm.pdf(x_axis,mfcc_mat.mean(axis=1),mfcc_mat.var(axis=1)))
+            plt.show() 
+        print(test_data_7.shape)
+
+#         color=cm.rainbow(np.linspace(0,1,c))
+#         for i,c_ in zip(range(c),color):
+#             plt.plot(y_7[:,i],c=c_, label = 'component: '+str(i))
+# #             plt.plot(y_7,c=c_, label = 'component: '+str(i))
+#             plt.legend()
+
+#         plt.title('Gaussian mixture, Posterior probabilities')
+#         plt.xlabel('components')
+#         plt.ylabel('frame')
+#         plt.pcolormesh(y_7, cmap=cmap)
+# #         a = gmm.weights_.reshape(2,int(c/2))
+# #         plt.plot(gmm.weights_)
+# #         print(a.shape)
+# #         plt.pcolormesh(a,cmap = cmap)
+#         plt.colorbar()
+#         plt.show()
+
+#     plt.gca()
+#     plt.scatter(mfcc_mat[:, 0], mfcc_mat[:, 1], mfcc_mat[:, 2], c=colors)
+#                                                 mfcc_mat[:, 3],
+#                                                 mfcc_mat[:, 4],
+#                                                 mfcc_mat[:, 5],
+#                                                 mfcc_mat[:, 6],
+#                                                 mfcc_mat[:, 7],
+#                                                 mfcc_mat[:, 8],
+#                                                 mfcc_mat[:, 9],
+#                                                 mfcc_mat[:, 10],
+#                                                 mfcc_mat[:, 11],
+#                                                 mfcc_mat[:, 12]),
+#                                                 c=colors)
+    
+############# USE BELOW FOR GETTING THE PLOTS NEEEDED FOR REPORT ##############
     # **********************************
 
     # test_data = []
@@ -335,20 +390,20 @@ def main():
     # plt.plot(x,y) # plot the path in the Accumulated distance matrix
     # plt.pcolormesh(AD, cmap=cmap)
     # plt.show()
-    # 
-    # labels = todigit2labels(data)    
+    #
+    # labels = todigit2labels(data)
     # print(labels)
-    
+
     # GD = get_global_dist(data)
     # Hierarchy clustering. Clusering based on MAX distance
     # clusters = linkage(GD,method='complete')
-    # 
+    #
     # dendrogram(clusters, labels=labels)
     # plt.show()
     # dendrogram(clusters, leaf_label_func=tidigit2labels(data))
-    
 
-    # TEST FOR CORRECT CALCULATIONS    
+
+    # TEST FOR CORRECT CALCULATIONS
     # pe = preemp(frames)
     # win = windowing(pe)
     # power_spec = powerSpectrum(win, 512)
@@ -386,7 +441,7 @@ def main():
 #     plt.plot(pe)
 #     plt.figure()
 
-#     plt.pcolormesh(pe) 
+#     plt.pcolormesh(pe)
 
     # hm = windowing(pe)
 
@@ -395,4 +450,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
+
