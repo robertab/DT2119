@@ -1,3 +1,5 @@
 *.npz
 *.pdf
+*.png
 tags
+__pycache__/
