@@ -1,7 +1,8 @@
 import numpy as np
 from tools2 import *
+from prondict import *
 
-def concatHMMs(hmmmodels, namelist):
+def concatHMMs(hmm_models, namelist):
     """ Concatenates HMM models in a left to right manner
 
     Args:
@@ -23,6 +24,18 @@ def concatHMMs(hmmmodels, namelist):
     Example:
        wordHMMs['o'] = concatHMMs(phoneHMMs, ['sil', 'ow', 'sil'])
     """
+    # print(hmm_models['sil']['transmat'])
+    M = len(namelist)*len(namelist)
+    combinedhmm = np.zeros((M+1, M+1))
+    i, j = 1, 1
+    for idx, phoneme in enumerate(namelist):
+        combinedhmm[idx*3:i*3+1, idx*3:j*3+1] = hmm_models[phoneme]['transmat']
+        j += 1
+        i += 1
+    return combinedhmm
+
+
+        
 
 
 def gmmloglik(log_emlik, weights):
@@ -106,7 +119,15 @@ def updateMeanAndVar(X, log_gamma, varianceFloor=5.0):
 
 
 def main():
-    print("Hello, world")
+    data = np.load('lab2_data.npz')['data']
+    phoneHMMs = np.load('lab2_models.npz')['phoneHMMs'].item()
+    example = np.load('lab2_example.npz')['example'].item()
+    modellist = {}
+    for digit in prondict.keys():
+        modellist[digit] = ['sil'] + prondict[digit] + ['sil']
+    wordHMMs = {}
+    wordHMMs['o'] = concatHMMs(phoneHMMs, modellist['o'])
+
     return 0
 
 
