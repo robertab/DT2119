@@ -1,6 +1,8 @@
 import numpy as np
 from tools2 import *
 from prondict import *
+import sklearn.mixture as sm
+import matplotlib.pylab as plt
 
 def concatHMMs(hmm_models, namelist):
     """ Concatenates HMM models in a left to right manner
@@ -24,18 +26,28 @@ def concatHMMs(hmm_models, namelist):
     Example:
        wordHMMs['o'] = concatHMMs(phoneHMMs, ['sil', 'ow', 'sil'])
     """
-    # print(hmm_models['sil']['transmat'])
     M = len(namelist)*len(namelist)
-    combinedhmm = np.zeros((M+1, M+1))
+    trans_mat = np.zeros((M+1, M+1))
     i, j = 1, 1
     for idx, phoneme in enumerate(namelist):
-        combinedhmm[idx*3:i*3+1, idx*3:j*3+1] = hmm_models[phoneme]['transmat']
+        trans_mat[idx*3:i*3+1, idx*3:j*3+1] = hmm_models[phoneme]['transmat']
         j += 1
         i += 1
-    return combinedhmm
-
-
-        
+#     plt.pcolormesh(trans_mat)
+#     plt.axis([0,10,10,0])
+#     plt.colorbar()
+#     plt.show()
+    
+    means = hmm_models[namelist[0]]['means']
+    for p in namelist[1:]:
+        means = np.concatenate((means,hmm_models[p]['means']))
+    
+    covars = hmm_models[namelist[0]]['covars']
+    for p in namelist[1:]:
+        covars = np.concatenate((covars,hmm_models[p]['covars']))
+    startprob = np.zeros((10,))
+    startprob[0] = 1
+    return {'transmat':trans_mat, 'means':means, 'covars':covars, 'startprob':startprob}
 
 
 def gmmloglik(log_emlik, weights):
@@ -51,7 +63,7 @@ def gmmloglik(log_emlik, weights):
         gmmloglik: scalar, log likelihood of data given the GMM model.
     """
 
-def forward(log_emlik, log_startprob, log_transmat):
+def forward(emlik, startprob, transmat):
     """Forward (alpha) probabilities in log domain.
 
     Args:
@@ -62,6 +74,10 @@ def forward(log_emlik, log_startprob, log_transmat):
     Output:
         forward_prob: NxM array of forward log probabilities for each of the M states in the model
     """
+    N, M = emlike.shape
+    forward_prob = np.zeros((N,M))
+    startprob.dot(emlike)
+
 
 def backward(log_emlik, log_startprob, log_transmat):
     """Backward (beta) probabilities in log domain.
@@ -116,6 +132,12 @@ def updateMeanAndVar(X, log_gamma, varianceFloor=5.0):
          covars: MxD covariance (variance) vectors for each state
     """
 
+def plot_obsloglike(obsloglike):
+    plt.figure()
+    plt.pcolormesh(obsloglike.T)
+#     plt.xlabel('features')
+#     plt.ylabel('features')
+    plt.colorbar()
 
 
 def main():
@@ -127,7 +149,20 @@ def main():
         modellist[digit] = ['sil'] + prondict[digit] + ['sil']
     wordHMMs = {}
     wordHMMs['o'] = concatHMMs(phoneHMMs, modellist['o'])
-
+    
+    # CHECK FOR CORRECTNESS.  same as example['obsloglik']
+    obsloglike = sm.log_multivariate_normal_density(example['lmfcc'],
+                                            wordHMMs['o']['means'],
+                                            wordHMMs['o']['covars'],
+                                            'diag')
+    x = sm.log_multivariate_normal_density(data[22]['lmfcc'],
+                                            wordHMMs['o']['means'],
+                                            wordHMMs['o']['covars'],
+                                            'diag')
+#     plot_obsloglike(x)
+#     plot_obsloglike(obsloglike)
+#     plt.show()
+    forward(example['obsloglik'], np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
     return 0
 
 
