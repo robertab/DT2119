@@ -33,19 +33,25 @@ def concatHMMs(hmm_models, namelist):
         trans_mat[idx*3:i*3+1, idx*3:j*3+1] = hmm_models[phoneme]['transmat']
         j += 1
         i += 1
+    # SET LAST ELEMENT TO 1.
+    trans_mat[-1,-1] = 1
+
+    # PLOT MATRIX
 #     plt.pcolormesh(trans_mat)
 #     plt.axis([0,10,10,0])
 #     plt.colorbar()
 #     plt.show()
-    
+
+    # CONCAT MEAN MATRICES
     means = hmm_models[namelist[0]]['means']
     for p in namelist[1:]:
         means = np.concatenate((means,hmm_models[p]['means']))
-    
+    # CONCAT COVAR MARTICES    
     covars = hmm_models[namelist[0]]['covars']
     for p in namelist[1:]:
         covars = np.concatenate((covars,hmm_models[p]['covars']))
-    startprob = np.zeros((10,))
+    # SET STARTPROB VECTOR
+    startprob = np.zeros((10,1))
     startprob[0] = 1
     return {'transmat':trans_mat, 'means':means, 'covars':covars, 'startprob':startprob}
 
@@ -63,7 +69,7 @@ def gmmloglik(log_emlik, weights):
         gmmloglik: scalar, log likelihood of data given the GMM model.
     """
 
-def forward(emlik, startprob, transmat):
+def forward(emlike, startprob, transmat):
     """Forward (alpha) probabilities in log domain.
 
     Args:
@@ -76,7 +82,14 @@ def forward(emlik, startprob, transmat):
     """
     N, M = emlike.shape
     forward_prob = np.zeros((N,M))
-    startprob.dot(emlike)
+    # INITIALISATION
+    for i in range(transmat.shape[1]-1):
+        forward_prob[i,0] = emlike[i,0] + startprob[i,0]
+    # FORWARD ALGORITHM
+    for t in range(1,M):
+        for i in range(N):
+            forward_prob[i,t] = logsumexp(forward_prob[:,t-1] + transmat[:-1,i]) + emlike[i,t] # skip last row in transmatrix since it is absorbing. 
+    return forward_prob
 
 
 def backward(log_emlik, log_startprob, log_transmat):
@@ -91,7 +104,7 @@ def backward(log_emlik, log_startprob, log_transmat):
         backward_prob: NxM array of backward log probabilities for each of the M states in the model
     """
 
-def viterbi(log_emlik, log_startprob, log_transmat):
+def viterbi(emlike, startprob, transmat):
     """Viterbi path.
 
     Args:
@@ -103,6 +116,25 @@ def viterbi(log_emlik, log_startprob, log_transmat):
         viterbi_loglik: log likelihood of the best path
         viterbi_path: best path
     """
+    N,M = emlike.shape
+    vi = np.zeros((N,M))    
+    path = np.zeros((N,M))
+    obsseq = np.zeros((M,))
+    # INIT
+    vi[:,0] = emlike[:,0] + startprob[:-1,0]
+    for t in range(1,M):
+        for i in range(N):
+            # MAX PROB OF PREVIOUS VI-timestep * P(we go from each of prevois states to i) * P(we obeserve i at timestep t). (use + insted of *, since log domain)
+            vi[i,t] = np.max(vi[:,t-1] + transmat[:-1,i]) + emlike[i,t]
+            path[i,t] = np.argmax(vi[:,t-1] + transmat[:-1,i])
+    zt = np.argmax(vi[:,-1])
+    print(zt)
+    obsseq[M-1] = zt
+    for t in range(M-1,0,-1):
+        zt = path[int(zt),t]
+        obsseq[t-1] = zt
+    return vi, obsseq
+
 
 def statePosteriors(log_alpha, log_beta):
     """State posterior (gamma) probabilities in log domain.
@@ -145,24 +177,21 @@ def main():
     phoneHMMs = np.load('lab2_models.npz')['phoneHMMs'].item()
     example = np.load('lab2_example.npz')['example'].item()
     modellist = {}
+    wordHMMs = {}
     for digit in prondict.keys():
         modellist[digit] = ['sil'] + prondict[digit] + ['sil']
-    wordHMMs = {}
-    wordHMMs['o'] = concatHMMs(phoneHMMs, modellist['o'])
+        wordHMMs[digit] = concatHMMs(phoneHMMs, modellist[digit])
     
     # CHECK FOR CORRECTNESS.  same as example['obsloglik']
     obsloglike = sm.log_multivariate_normal_density(example['lmfcc'],
                                             wordHMMs['o']['means'],
                                             wordHMMs['o']['covars'],
                                             'diag')
-    x = sm.log_multivariate_normal_density(data[22]['lmfcc'],
-                                            wordHMMs['o']['means'],
-                                            wordHMMs['o']['covars'],
-                                            'diag')
-#     plot_obsloglike(x)
-#     plot_obsloglike(obsloglike)
-#     plt.show()
-    forward(example['obsloglik'], np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+    alpha_mat = forward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+    # LOGLIKELIHOOD
+    loglike = logsumexp(alpha_mat.T[-1,:].T)
+    vi, obsseq = viterbi(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+    print(example['vloglik'][1] - obsseq)
     return 0
 
 
