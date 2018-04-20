@@ -128,7 +128,6 @@ def viterbi(emlike, startprob, transmat):
             vi[i,t] = np.max(vi[:,t-1] + transmat[:-1,i]) + emlike[i,t]
             path[i,t] = np.argmax(vi[:,t-1] + transmat[:-1,i])
     zt = np.argmax(vi[:,-1])
-    print(zt)
     obsseq[M-1] = zt
     for t in range(M-1,0,-1):
         zt = path[int(zt),t]
