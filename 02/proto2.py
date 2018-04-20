@@ -79,6 +79,7 @@ def forward(emlike, startprob, transmat):
 
     Output:
         forward_prob: NxM array of forward log probabilities for each of the M states in the model
+        alpha (forward_prob) is a joint probability of observations AND state at time step t.
     """
     N, M = emlike.shape
     forward_prob = np.zeros((N,M))
@@ -92,7 +93,7 @@ def forward(emlike, startprob, transmat):
     return forward_prob
 
 
-def backward(log_emlik, log_startprob, log_transmat):
+def backward(emlike, startprob, transmat):
     """Backward (beta) probabilities in log domain.
 
     Args:
@@ -102,7 +103,17 @@ def backward(log_emlik, log_startprob, log_transmat):
 
     Output:
         backward_prob: NxM array of backward log probabilities for each of the M states in the model
+        beta (backward_prob) is a conditional probability of the observations GIVEN the state at time step t.  
     """
+    N, M = emlike.shape
+    backward_prob = np.zeros((N,M))
+    # INIT
+    backward_prob[:,-1] = 0
+    # BACKWARD PASS
+    for t in range(M-2,-1,-1):
+        for i in range(N):
+            backward_prob[i,t] = logsumexp(transmat[:-1, i] + backward_prob[:,t+1] + emlike[i,t+1])
+    return backward_prob
 
 def viterbi(emlike, startprob, transmat):
     """Viterbi path.
@@ -187,10 +198,13 @@ def main():
                                             wordHMMs['o']['covars'],
                                             'diag')
     alpha_mat = forward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+#     print(alpha_mat.T - example['logalpha'])
     # LOGLIKELIHOOD
     loglike = logsumexp(alpha_mat.T[-1,:].T)
     vi, obsseq = viterbi(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
-    print(example['vloglik'][1] - obsseq)
+#     print(example['vloglik'][1] - obsseq)
+    beta_mat = backward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+    print(np.round(beta_mat.T - example['logbeta']))
     return 0
 
 
