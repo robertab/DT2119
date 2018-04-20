@@ -157,6 +157,13 @@ def statePosteriors(log_alpha, log_beta):
     Output:
         log_gamma: NxM array of gamma probabilities for each of the M states in the model
     """
+    # print(log_alpha.shape)
+    log_gamma = np.empty(log_alpha.shape)
+    M, N = log_alpha.shape
+    for n in range(N):
+        for i in range(M):
+            log_gamma[i, n] = log_alpha[i, n] + log_beta[i, n] - logsumexp(log_alpha[:, N-1])
+    return log_gamma
 
 def updateMeanAndVar(X, log_gamma, varianceFloor=5.0):
     """ Update Gaussian parameters with diagonal covariance
@@ -203,7 +210,9 @@ def main():
     loglike = logsumexp(alpha_mat.T[-1,:].T)
     vi, obsseq = viterbi(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
     # print(example['vloglik'][1] - obsseq)
-    beta_mat = backward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+    beta_mat = backward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat']))
+    gamma_mat = statePosteriors(alpha_mat, beta_mat)
+    # print(example['loggamma'])
     # print(np.sum(beta_mat.T - example['logbeta']))
     # print(beta_mat.T[:, -2])
     # print(example['logbeta'][:, -2])
