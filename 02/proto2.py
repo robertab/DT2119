@@ -89,7 +89,7 @@ def forward(emlike, startprob, transmat):
     # FORWARD ALGORITHM
     for t in range(1,M):
         for i in range(N):
-            forward_prob[i,t] = logsumexp(forward_prob[:,t-1] + transmat[:-1,i]) + emlike[i,t] # skip last row in transmatrix since it is absorbing. 
+            forward_prob[i, t] = logsumexp(forward_prob[:, t-1] + transmat[:-1, i]) + emlike[i, t] # skip last row in transmatrix since it is absorbing. 
     return forward_prob
 
 
@@ -106,13 +106,13 @@ def backward(emlike, startprob, transmat):
         beta (backward_prob) is a conditional probability of the observations GIVEN the state at time step t.  
     """
     N, M = emlike.shape
-    backward_prob = np.zeros((N,M))
+    backward_prob = np.empty((N, M))
     # INIT
-    backward_prob[:,-1] = 0
+    backward_prob[:, -1] = 0.0
     # BACKWARD PASS
-    for t in range(M-2,-1,-1):
-        for i in range(N):
-            backward_prob[i,t] = logsumexp(transmat[:-1, i] + backward_prob[:,t+1] + emlike[i,t+1])
+    for n in range(M-2, -1, -1):
+        for j in range(N):
+            backward_prob[j, n] = logsumexp(transmat[j, :-1] + emlike[:, n+1] + backward_prob[:, n+1])
     return backward_prob
 
 def viterbi(emlike, startprob, transmat):
@@ -198,13 +198,15 @@ def main():
                                             wordHMMs['o']['covars'],
                                             'diag')
     alpha_mat = forward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
-#     print(alpha_mat.T - example['logalpha'])
+    # print(alpha_mat.T - example['logalpha'])
     # LOGLIKELIHOOD
     loglike = logsumexp(alpha_mat.T[-1,:].T)
     vi, obsseq = viterbi(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
-#     print(example['vloglik'][1] - obsseq)
+    # print(example['vloglik'][1] - obsseq)
     beta_mat = backward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
-    print(np.round(beta_mat.T - example['logbeta']))
+    # print(np.sum(beta_mat.T - example['logbeta']))
+    # print(beta_mat.T[:, -2])
+    # print(example['logbeta'][:, -2])
     return 0
 
 
