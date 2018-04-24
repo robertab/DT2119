@@ -3,7 +3,7 @@ from tools2 import *
 from prondict import *
 import sklearn.mixture as sm
 import matplotlib.pylab as plt
-
+np.set_printoptions(threshold=np.nan)
 def concatHMMs(hmm_models, namelist):
     """ Concatenates HMM models in a left to right manner
 
@@ -26,10 +26,13 @@ def concatHMMs(hmm_models, namelist):
     Example:
        wordHMMs['o'] = concatHMMs(phoneHMMs, ['sil', 'ow', 'sil'])
     """
-    M = len(namelist)*len(namelist)
-    trans_mat = np.zeros((M+1, M+1))
+#     M = len(namelist)*len(namelist)
+    M = len(namelist)
+    trans_mat = np.zeros((M*3+1, M*3+1))
+#     print(trans_mat.shape)
     i, j = 1, 1
     for idx, phoneme in enumerate(namelist):
+#         print(hmm_models[phoneme]['transmat'].shape)
         trans_mat[idx*3:i*3+1, idx*3:j*3+1] = hmm_models[phoneme]['transmat']
         j += 1
         i += 1
@@ -51,7 +54,7 @@ def concatHMMs(hmm_models, namelist):
     for p in namelist[1:]:
         covars = np.concatenate((covars,hmm_models[p]['covars']))
     # SET STARTPROB VECTOR
-    startprob = np.zeros((10,1))
+    startprob = np.zeros((M*3+1,1))
     startprob[0] = 1
     return {'transmat':trans_mat, 'means':means, 'covars':covars, 'startprob':startprob}
 
@@ -84,7 +87,7 @@ def forward(emlike, startprob, transmat):
     N, M = emlike.shape
     forward_prob = np.zeros((N,M))
     # INITIALISATION
-    for i in range(transmat.shape[1]-1):
+    for i in range(N):
         forward_prob[i,0] = emlike[i,0] + startprob[i,0]
     # FORWARD ALGORITHM
     for t in range(1,M):
@@ -163,9 +166,13 @@ def statePosteriors(log_alpha, log_beta):
     for n in range(N):
         for i in range(M):
             log_gamma[i, n] = log_alpha[i, n] + log_beta[i, n] - logsumexp(log_alpha[:, N-1])
+
+#     print(logsumexp(log_gamma) / np.sum(logsumexp(log_gamma)))
+#     print(logsumexp(log_gamma.T)) # marginalizing over timesteps (observations)
+#     print(np.sum(logsumexp(log_gamma.T))) # summing over states and observations
     return log_gamma
 
-def updateMeanAndVar(X, log_gamma, varianceFloor=5.0):
+def updateMeanAndVar(X, gamma, varianceFloor=5.0):
     """ Update Gaussian parameters with diagonal covariance
 
     Args:
@@ -181,12 +188,38 @@ def updateMeanAndVar(X, log_gamma, varianceFloor=5.0):
          covars: MxD covariance (variance) vectors for each state
     """
 
+def baum_welch(data,wordHMMs):
+    converging = True
+    while converging:
+        obsloglike = log_multivariate_normal_density_diag(data,wordHMMs['4']['means'],wordHMMs['4']['covars'])
+        alpha = forward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
+        beta = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
+        gamma = statePosteriors(alpha,beta)
+        print(gamma.sum(axis=1).shape)
+        means, covars = updateMeanAndVar(data[10]['lmfcc'],gamma_mat)
+        converging = False
+        
+    pass
+
 def plot_obsloglike(obsloglike):
     plt.figure()
     plt.pcolormesh(obsloglike.T)
 #     plt.xlabel('features')
 #     plt.ylabel('features')
     plt.colorbar()
+
+def compute_scores(wordHMMs, data):
+    scores = {}
+    for i,model in enumerate(wordHMMs):
+        score = []
+        for j,utterance in enumerate(data):
+            obslike = log_multivariate_normal_density_diag(utterance['lmfcc'],
+                                                        wordHMMs[model]['means'],
+                                                        wordHMMs[model]['covars'])
+            alphas = forward(obslike.T,np.log(wordHMMs[model]['startprob']),np.log(wordHMMs[model]['transmat']))
+            score.append((utterance['digit'], logsumexp(alphas.T[-1,:].T)))
+        scores[model] = score
+    return alphas, scores
 
 
 def main():
@@ -195,27 +228,39 @@ def main():
     example = np.load('lab2_example.npz')['example'].item()
     modellist = {}
     wordHMMs = {}
+
     for digit in prondict.keys():
+#         if digit == 'z':
         modellist[digit] = ['sil'] + prondict[digit] + ['sil']
         wordHMMs[digit] = concatHMMs(phoneHMMs, modellist[digit])
     
     # CHECK FOR CORRECTNESS.  same as example['obsloglik']
-    obsloglike = sm.log_multivariate_normal_density(example['lmfcc'],
-                                            wordHMMs['o']['means'],
-                                            wordHMMs['o']['covars'],
-                                            'diag')
-    alpha_mat = forward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
-    # print(alpha_mat.T - example['logalpha'])
-    # LOGLIKELIHOOD
+    obsloglike = log_multivariate_normal_density_diag(data[10]['lmfcc'],
+                                            wordHMMs['4']['means'],
+                                            wordHMMs['4']['covars'])
+    alpha_mat = forward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
+#     print(alpha_mat.T - example['logalpha'])
+
+    # SCORE ALL 44 UTTERANCES
+#     alphas, scores = compute_scores(wordHMMs, data)
+#     print(sorted(scores['z'],key=lambda x: x[1], reverse=True))
+
+       # LOGLIKELIHOOD
     loglike = logsumexp(alpha_mat.T[-1,:].T)
-    vi, obsseq = viterbi(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+#     print(loglike)
+    vi, obsseq = viterbi(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
     # print(example['vloglik'][1] - obsseq)
-    beta_mat = backward(example['obsloglik'].T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat']))
-    gamma_mat = statePosteriors(alpha_mat, beta_mat)
-    # print(example['loggamma'])
-    # print(np.sum(beta_mat.T - example['logbeta']))
+    beta_mat = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat']))
+#     print(gamma_mat.T - example['loggamma'])
     # print(beta_mat.T[:, -2])
     # print(example['logbeta'][:, -2])
+    
+    # CAL POSTERIORS
+    gamma_mat = statePosteriors(alpha_mat, beta_mat)
+    # print(example['loggamma'])
+    
+    # UPDATE MEAN AND VARIANCE - BAUM WELCH
+    baum_welch(data[10]['lmfcc'], wordHMMs)
     return 0
 
 
