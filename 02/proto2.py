@@ -4,6 +4,7 @@ from prondict import *
 import sklearn.mixture as sm
 import matplotlib.pylab as plt
 np.set_printoptions(threshold=np.nan)
+np.seterr(divide='ignore')
 def concatHMMs(hmm_models, namelist):
     """ Concatenates HMM models in a left to right manner
 
@@ -187,19 +188,56 @@ def updateMeanAndVar(X, gamma, varianceFloor=5.0):
          means: MxD mean vectors for each state
          covars: MxD covariance (variance) vectors for each state
     """
+    N, T = gamma.shape
+    D = X.shape[1]
+    # means, covars =  np.zeros((N, D)), np.zeros((N, D))
+
+    numer = np.exp(gamma).dot(X)
+    denom = np.exp(gamma).T.sum(0).reshape(-1, 1)
+    means = numer / denom
+    covars = np.zeros((N, D))
+    for state in range(N):
+        denom = 0
+        for t in range(T):
+            numer = np.dot(gamma[state, t], (X[t, :] - means[state, :])**2)
+            denom += gamma[state, t]
+        covars[state,:] = numer / denom
+            
+            
+            
+        
+
+    # numer = np.exp(gamma).dot(X)
+    # denom = np.exp(gamma).T.sum(0).reshape(-1, 1)
+    # means = numer / denom
+    # diff = (X[:, ] - means.sum(0))**2
+    # covars = np.divide(np.exp(gamma).dot(diff), denom)
+    # covars = np.where(covars < varianceFloor, varianceFloor, covars)
+    # print(means.shape, covars.shape)
+    return means, covars
+
+
+    
+    
 
 def baum_welch(data,wordHMMs):
+    orig_means, orig_covars = wordHMMs['4']['means'], wordHMMs['4']['covars']
     converging = True
-    while converging:
+    for _ in range(20):
         obsloglike = log_multivariate_normal_density_diag(data,wordHMMs['4']['means'],wordHMMs['4']['covars'])
+        # print("Data shape: {}, Obs shape: {}".format(data.shape, obsloglike.shape))
         alpha = forward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
-        beta = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
-        gamma = statePosteriors(alpha,beta)
-        print(gamma.sum(axis=1).shape)
-        means, covars = updateMeanAndVar(data[10]['lmfcc'],gamma_mat)
+        beta = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat']))
+        print(logsumexp(alpha.T[-1,:].T))        
+        # print(wordHMMs['4']['covars'].shape, wordHMMs['4']['means'].shape)
+        gamma = statePosteriors(alpha, beta)
+        means, covars = updateMeanAndVar(data, gamma)
+        # print(covars, wordHMMs['4']['covars'])
+        # means, covars = updateMeanAndVar(data[10]['lmfcc'],gamma_mat)
+        wordHMMs['4']['means'] = means
+        wordHMMs['4']['covars'] = covars
         converging = False
-        
-    pass
+    return 
 
 def plot_obsloglike(obsloglike):
     plt.figure()
