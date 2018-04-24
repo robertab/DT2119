@@ -168,9 +168,9 @@ def statePosteriors(log_alpha, log_beta):
         for i in range(M):
             log_gamma[i, n] = log_alpha[i, n] + log_beta[i, n] - logsumexp(log_alpha[:, N-1])
 
-#     print(logsumexp(log_gamma) / np.sum(logsumexp(log_gamma)))
-#     print(logsumexp(log_gamma.T)) # marginalizing over timesteps (observations)
-#     print(np.sum(logsumexp(log_gamma.T))) # summing over states and observations
+#     print(log_gamma.shape) # (15,86)
+#     print(np.exp(log_gamma).sum(0)) # marginalize over timesteps. each Sums to 1
+#     print(np.exp(log_gamma).sum(1)) # marginalize over observations. expected number of times we are in each state.
     return log_gamma
 
 def updateMeanAndVar(X, gamma, varianceFloor=5.0):
@@ -188,32 +188,33 @@ def updateMeanAndVar(X, gamma, varianceFloor=5.0):
          means: MxD mean vectors for each state
          covars: MxD covariance (variance) vectors for each state
     """
+#     X = 86,13
+#     means, covars = 15,13
+#     gamma = 15,86
+#     print(X.shape)
+#     print(gamma.shape)
+
     N, T = gamma.shape
     D = X.shape[1]
     # means, covars =  np.zeros((N, D)), np.zeros((N, D))
 
-    numer = np.exp(gamma).dot(X)
-    denom = np.exp(gamma).T.sum(0).reshape(-1, 1)
-    means = numer / denom
+#     numer = np.exp(gamma).dot(X)
+#     denom = np.exp(gamma).T.sum(0).reshape(-1, 1)
+#     means = numer / denom
+    means = np.zeros(())
+#     print(means.shape)
     covars = np.zeros((N, D))
     for state in range(N):
-        denom = 0
-        for t in range(T):
-            numer = np.dot(gamma[state, t], (X[t, :] - means[state, :])**2)
-            denom += gamma[state, t]
-        covars[state,:] = numer / denom
-            
-            
+        for obs in range(D):
+            numer = 0
+            for t in range(T):
+                numer += np.exp(gamma[state,t]) * (X[t, obs] - means[state, obs])**2
+            covars[state,obs] = numer / logsumexp(gamma[state,:])
+#     print(covars)       
             
         
 
-    # numer = np.exp(gamma).dot(X)
-    # denom = np.exp(gamma).T.sum(0).reshape(-1, 1)
-    # means = numer / denom
-    # diff = (X[:, ] - means.sum(0))**2
-    # covars = np.divide(np.exp(gamma).dot(diff), denom)
-    # covars = np.where(covars < varianceFloor, varianceFloor, covars)
-    # print(means.shape, covars.shape)
+    covars = np.where(covars < varianceFloor, varianceFloor, covars)
     return means, covars
 
 
@@ -221,21 +222,21 @@ def updateMeanAndVar(X, gamma, varianceFloor=5.0):
     
 
 def baum_welch(data,wordHMMs):
-    orig_means, orig_covars = wordHMMs['4']['means'], wordHMMs['4']['covars']
+    orig_means, orig_covars = wordHMMs['means'], wordHMMs['covars']
     converging = True
     for _ in range(20):
-        obsloglike = log_multivariate_normal_density_diag(data,wordHMMs['4']['means'],wordHMMs['4']['covars'])
+        obsloglike = log_multivariate_normal_density_diag(data,wordHMMs['means'],wordHMMs['covars'])
         # print("Data shape: {}, Obs shape: {}".format(data.shape, obsloglike.shape))
-        alpha = forward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
-        beta = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat']))
+        alpha = forward(obsloglike.T, np.log(wordHMMs['startprob']), np.log(wordHMMs['transmat'])) 
+        beta = backward(obsloglike.T, np.log(wordHMMs['startprob']), np.log(wordHMMs['transmat']))
         print(logsumexp(alpha.T[-1,:].T))        
         # print(wordHMMs['4']['covars'].shape, wordHMMs['4']['means'].shape)
         gamma = statePosteriors(alpha, beta)
         means, covars = updateMeanAndVar(data, gamma)
         # print(covars, wordHMMs['4']['covars'])
         # means, covars = updateMeanAndVar(data[10]['lmfcc'],gamma_mat)
-        wordHMMs['4']['means'] = means
-        wordHMMs['4']['covars'] = covars
+        wordHMMs['means'] = means
+        wordHMMs['covars'] = covars
         converging = False
     return 
 
@@ -298,7 +299,7 @@ def main():
     # print(example['loggamma'])
     
     # UPDATE MEAN AND VARIANCE - BAUM WELCH
-    baum_welch(data[10]['lmfcc'], wordHMMs)
+    baum_welch(data[34]['lmfcc'], wordHMMs['5'])
     return 0
 
 
