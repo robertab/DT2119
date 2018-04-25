@@ -155,7 +155,6 @@ def statePosteriors(log_alpha, log_beta):
     for n in range(N):
         for i in range(M):
             log_gamma[i, n] = log_alpha[i, n] + log_beta[i, n] - logsumexp(log_alpha[:, N-1])
-
     return log_gamma
 
 def updateMeanAndVar(X, gamma, varianceFloor=5.0):
@@ -179,23 +178,37 @@ def updateMeanAndVar(X, gamma, varianceFloor=5.0):
 
     N, T = gamma.shape
     D = X.shape[1]
-    means = np.zeros((N, D))
-    for state in range(N):
-        for obs in range(D):
-            numer = logsumexp(gamma[state, :] + X[:, obs])
-            # for t in range(T):
-            #     numer += np.exp(gamma[state,t]) * X[t, obs]
-            means[state, obs] = numer / logsumexp(gamma[state,:])
+    
+    numer = np.exp(gamma).dot(X)
+    denom = np.exp(gamma).sum(1).reshape(-1,1)
+    means = numer / denom
+    
     covars = np.zeros((N, D))
     for state in range(N):
         for obs in range(D):
             numer = 0
-            for t in range(T):
-                numer += np.exp(gamma[state,t]) * (X[t, obs] - means[state, obs])**2
-            covars[state,obs] = numer / logsumexp(gamma[state,:])
+            W =  (X[:, obs] - means[state, obs])**2
+            numer = np.exp(gamma[state,:]).dot(W.reshape(-1,1))    
+#             print(numer)
+            covars[state,obs] = numer[0] / logsumexp(gamma[state,:])
+            
+#     means = np.zeros((N, D))
+#     for state in range(N):
+#         for obs in range(D):
+#             numer = logsumexp(gamma[state, :] + X[:, obs])
+#             # for t in range(T):
+#             #     numer += np.exp(gamma[state,t]) * X[t, obs]
+#             means[state, obs] = numer / logsumexp(gamma[state,:])
+
+#     covars = np.zeros((N, D))
+#     for state in range(N):
+#         for obs in range(D):
+#             numer = 0
+#             for t in range(T):
+#                 numer += np.exp(gamma[state,t]) * (X[t, obs] - means[state, obs])**2
+#             covars[state,obs] = numer / logsumexp(gamma[state,:])
             
         
-
     covars = np.where(covars < varianceFloor, varianceFloor, covars)
     return means, covars
 
@@ -203,17 +216,19 @@ def updateMeanAndVar(X, gamma, varianceFloor=5.0):
 def baum_welch(data,wordHMMs):
     orig_means, orig_covars = wordHMMs['means'], wordHMMs['covars']
     converging = True
+    scores = []
     for _ in range(20):
         obsloglike = log_multivariate_normal_density_diag(data,wordHMMs['means'],wordHMMs['covars'])
         alpha = forward(obsloglike.T, np.log(wordHMMs['startprob']), np.log(wordHMMs['transmat'])) 
         beta = backward(obsloglike.T, np.log(wordHMMs['startprob']), np.log(wordHMMs['transmat']))
+        scores.append(logsumexp(alpha.T[-1,:].T)) 
         print(logsumexp(alpha.T[-1,:].T))        
         gamma = statePosteriors(alpha, beta)
         means, covars = updateMeanAndVar(data, gamma)
         wordHMMs['means'] = means
         wordHMMs['covars'] = covars
         converging = False
-    return 
+    return scores
 
 def plot_obsloglike(obsloglike):
     plt.figure()
@@ -256,7 +271,6 @@ def main():
     # SCORE ALL 44 UTTERANCES
     # alphas, scores = compute_scores(wordHMMs, data)
 
-
     # LOGLIKELIHOOD
     loglike = logsumexp(alpha_mat.T[-1,:].T)
 
@@ -266,9 +280,18 @@ def main():
     
     # CALC POSTERIORS
     gamma_mat = statePosteriors(alpha_mat, beta_mat)
+#     print(np.exp(log_gamma).sum(0)) # summing over states. all=1. we will go to SOME state in each timestep.
+#     print(np.exp(log_gamma).sum(1)) # summing over timesteps. expected number of times we are in state i.
     
     # UPDATE MEAN AND VARIANCE - BAUM WELCH
-    baum_welch(data[10]['lmfcc'], wordHMMs['4'])
+    print("SCORES: 4 0N 4")
+    scores4_4 = baum_welch(data[10]['lmfcc'], wordHMMs['4'])
+    print("\n SCORES: 4 0N 9")
+    scores4_9 = baum_welch(data[11]['lmfcc'], wordHMMs['4'])
+    plt.plot(scores4_4, label='4_on_4a')
+    plt.plot(scores4_9, label='4_on_4b')
+    plt.legend()
+    plt.show()
     return 0
 
 
