@@ -5,6 +5,7 @@ import sklearn.mixture as sm
 import matplotlib.pylab as plt
 np.set_printoptions(threshold=np.nan)
 np.seterr(divide='ignore')
+np.random.seed(400)
 
 def concatHMMs(hmm_models, namelist):
     """ Concatenates HMM models in a left to right manner
@@ -124,17 +125,26 @@ def viterbi(emlike, startprob, transmat):
     path = np.zeros((N,M))
     obsseq = np.zeros((M,))
     # INIT
-    vi[:,0] = emlike[:,0] + startprob[:-1,0]
+    for i in range(N):
+        vi[i,0] = emlike[i,0] + startprob[i,0]
+    print(emlike.shape)
+#     vi[:,0] = emlike[:,0] + startprob[:,0]
     for t in range(1,M):
         for i in range(N):
+            temp = vi[:,t-1] + transmat[:-1,i]
+            vi[i,t] = np.max(temp) + emlike[i,t]
+            path[i,t] = np.argmax(temp)
             # MAX PROB OF PREVIOUS VI-timestep * P(we go from each of prevois states to i) * P(we obeserve i at timestep t). (use + insted of *, since log domain)
-            vi[i,t] = np.max(vi[:,t-1] + transmat[:-1,i]) + emlike[i,t]
-            path[i,t] = np.argmax(vi[:,t-1] + transmat[:-1,i])
+#             vi[i,t] = np.max(vi[:,t-1] + transmat[:-1,i] , axis = 1) + emlike[i,t]
+#             path[i,t] = np.argmax(vi[:,t-1] + transmat[:-1,i])
     zt = np.argmax(vi[:,-1])
     obsseq[M-1] = zt
     for t in range(M-1,0,-1):
         zt = path[int(zt),t]
         obsseq[t-1] = zt
+    
+#     vit[-1,argmax(1)[-1]], vit.argmax(1)
+    
     return vi, obsseq
 
 
@@ -189,26 +199,8 @@ def updateMeanAndVar(X, gamma, varianceFloor=5.0):
             numer = 0
             W =  (X[:, obs] - means[state, obs])**2
             numer = np.exp(gamma[state,:]).dot(W.reshape(-1,1))    
-#             print(numer)
             covars[state,obs] = numer[0] / logsumexp(gamma[state,:])
             
-#     means = np.zeros((N, D))
-#     for state in range(N):
-#         for obs in range(D):
-#             numer = logsumexp(gamma[state, :] + X[:, obs])
-#             # for t in range(T):
-#             #     numer += np.exp(gamma[state,t]) * X[t, obs]
-#             means[state, obs] = numer / logsumexp(gamma[state,:])
-
-#     covars = np.zeros((N, D))
-#     for state in range(N):
-#         for obs in range(D):
-#             numer = 0
-#             for t in range(T):
-#                 numer += np.exp(gamma[state,t]) * (X[t, obs] - means[state, obs])**2
-#             covars[state,obs] = numer / logsumexp(gamma[state,:])
-            
-        
     covars = np.where(covars < varianceFloor, varianceFloor, covars)
     return means, covars
 
@@ -238,17 +230,27 @@ def plot_obsloglike(obsloglike):
     plt.colorbar()
 
 def compute_scores(wordHMMs, data):
-    scores = {}
+    scores = np.zeros((len(wordHMMs), len(data)))
     for i,model in enumerate(wordHMMs):
-        score = []
         for j,utterance in enumerate(data):
             obslike = log_multivariate_normal_density_diag(utterance['lmfcc'],
                                                         wordHMMs[model]['means'],
                                                         wordHMMs[model]['covars'])
             alphas = forward(obslike.T,np.log(wordHMMs[model]['startprob']),np.log(wordHMMs[model]['transmat']))
-            score.append((utterance['digit'], logsumexp(alphas.T[-1,:].T)))
-        scores[model] = score
+            scores[i,j] = logsumexp(alphas.T[-1,:].T)
     return alphas, scores
+
+def compute_scores_viterbi(wordHMMs, data):
+    scores = np.zeros((len(wordHMMs), len(data)))
+    for i,model in enumerate(wordHMMs):
+        for j,utterance in enumerate(data):
+            obsloglike = log_multivariate_normal_density_diag(utterance['lmfcc'],
+                                                        wordHMMs[model]['means'],
+                                                        wordHMMs[model]['covars'])
+#             alphas = forward(obslike.T,np.log(wordHMMs[model]['startprob']),np.log(wordHMMs[model]['transmat']))
+            vi, _ = viterbi(obsloglike.T, np.log(wordHMMs[model]['startprob']), np.log(wordHMMs[model]['transmat'])) 
+            scores[i,j] = np.max(vi.T[-1,:].T)
+    return vi, scores
 
 
 def main():
@@ -263,35 +265,69 @@ def main():
         wordHMMs[digit] = concatHMMs(phoneHMMs, modellist[digit])
     
     # CHECK FOR CORRECTNESS.  same as example['obsloglik']
-    obsloglike = log_multivariate_normal_density_diag(data[10]['lmfcc'],
-                                            wordHMMs['4']['means'],
-                                            wordHMMs['4']['covars'])
-    alpha_mat = forward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
+    obsloglike = log_multivariate_normal_density_diag(example['lmfcc'],
+                                            wordHMMs['o']['means'],
+                                            wordHMMs['o']['covars'])
+    alpha_mat = forward(obsloglike.T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+    print(logsumexp(alpha_mat.T[-1,:]))
+    print(example['loglik'])
 
     # SCORE ALL 44 UTTERANCES
-    # alphas, scores = compute_scores(wordHMMs, data)
+    alphas, scores = compute_scores(wordHMMs, data)
+    plt.figure()
+    plt.title('alpha prediction')
+    pred = np.argmax(scores,axis = 0)
+    print('alpha scoring {}'.format(pred))
+    plt.plot(pred)
+    plt.show()
+#     for d in scores.keys():
+#         plt.scatter(d,d, c='b', label='true')
+#         o = sorted(scores[d], key=lambda x: x[1],reverse=True)
+#         plt.scatter(d, o[0][0], c='r', label='prediction')
+#     plt.legend()
+    plt.show()
+# 
 
     # LOGLIKELIHOOD
     loglike = logsumexp(alpha_mat.T[-1,:].T)
+    vi, obsseq = viterbi(obsloglike.T, np.log(wordHMMs['o']['startprob']), np.log(wordHMMs['o']['transmat'])) 
+#     plt.pcolormesh(alpha_mat)
+#     plt.plot(obsseq)
+#     plt.show()
+    print(example['vloglik'][0])
+    print(np.max(vi.T[-1,:]))
 
-    vi, obsseq = viterbi(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat'])) 
-
-    beta_mat = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat']))
-    
-    # CALC POSTERIORS
-    gamma_mat = statePosteriors(alpha_mat, beta_mat)
-#     print(np.exp(log_gamma).sum(0)) # summing over states. all=1. we will go to SOME state in each timestep.
-#     print(np.exp(log_gamma).sum(1)) # summing over timesteps. expected number of times we are in state i.
-    
-    # UPDATE MEAN AND VARIANCE - BAUM WELCH
-    print("SCORES: 4 0N 4")
-    scores4_4 = baum_welch(data[10]['lmfcc'], wordHMMs['4'])
-    print("\n SCORES: 4 0N 9")
-    scores4_9 = baum_welch(data[11]['lmfcc'], wordHMMs['4'])
-    plt.plot(scores4_4, label='4_on_4a')
-    plt.plot(scores4_9, label='4_on_4b')
-    plt.legend()
+    # SCORE ALL 44 UTTERANCES USING viterebi
+    vi, scores = compute_scores_viterbi(wordHMMs, data)
+    pred = np.argmax(scores, axis=0)
+    print('viterbi scoring {}'.format(pred))
+    plt.figure()
+    plt.title('viterbi prediction')
+    plt.plot(pred)
+#     for d in scores.keys():
+#         plt.scatter(d,d, c='b', label = 'true')
+#         o = sorted(scores[d], key=lambda x: x[1],reverse=True)
+#         plt.scatter(d, o[0][0], c='r', label='true')
+#     plt.legend()
     plt.show()
+
+#     beta_mat = backward(obsloglike.T, np.log(wordHMMs['4']['startprob']), np.log(wordHMMs['4']['transmat']))
+#     
+#     # CALC POSTERIORS
+#     gamma_mat = statePosteriors(alpha_mat, beta_mat)
+#     print(np.exp(gamma_mat).sum(0)) # summing over states. all=1. we will go to SOME state in each timestep.
+#     print(np.exp(gamma_mat).sum(1)) # summing over timesteps. expected number of times we are in state i.
+#     print(np.exp(gamma_mat).sum()) 
+#     
+#     # UPDATE MEAN AND VARIANCE - BAUM WELCH
+#     print("SCORES: 4 0N 4")
+#     scores4_4 = baum_welch(data[10]['lmfcc'], wordHMMs['4'])
+#     print("\n SCORES: 4 0N 9")
+#     scores4_9 = baum_welch(data[11]['lmfcc'], wordHMMs['9'])
+#     plt.plot(scores4_4, label='4_on_4a')
+#     plt.plot(scores4_9, label='4_on_4b')
+#     plt.legend()
+#     plt.show()
     return 0
 
 
