@@ -62,7 +62,14 @@ def enframe(samples, winlen, winshift):
         numpy array [N x winlen], where N is the number of windows that fit
         in the input signal
     """
-    return np.asarray(list(windowed(samples, winlen, step=winshift, fillvalue=0)))
+    enframe = []
+    for frame in range(0, len(samples), winshift):
+        if frame+winlen <= len(samples):
+            enframe.append(samples[frame:frame+winlen])
+        else:
+            break
+    return enframe
+#return np.asarray(list(windowed(samples, winlen, step=winshift, fillvalue=0)))
 
 
 def preemp(input, p=0.97):
